@@ -13,6 +13,12 @@ MISSION CONTROL V6.0 — BOT V15 PRODUCTION SOL + AI BRIDGE
 from flask import Flask, jsonify, render_template_string, request, send_file, abort
 from OVERTOP_BASSANO_V15_PRODUCTION import OvertopBassanoV15Production
 from ai_bridge import AIBridge
+try:
+    import supervisor_new as sv_new
+    _sv_new_ok = True
+except ImportError:
+    _sv_new_ok = False
+    sv_new = None
 import sqlite3
 import json
 import threading
@@ -672,6 +678,15 @@ def bot_thread_launcher():
                 heartbeat_lock=heartbeat_lock,
                 db_execute=db_execute,
             )
+            # Registra asset nel supervisor cross-asset
+            if _sv_new_ok and sv_new:
+                try:
+                    from OVERTOP_BASSANO_V15_PRODUCTION import SYMBOL as _BOT_SYMBOL
+                    sv_new.register_asset(_BOT_SYMBOL, heartbeat_data, heartbeat_lock)
+                    log(f"[SUPERVISOR_V2] ✅ Asset {_BOT_SYMBOL} registrato")
+                except Exception as _e:
+                    log(f"[SUPERVISOR_V2] ⚠️ {_e}")
+
             with heartbeat_lock:
                 heartbeat_data["status"]  = "RUNNING"
                 heartbeat_data["mode"]    = "PAPER" if bot.paper_trade else "LIVE"
@@ -2643,7 +2658,8 @@ def _execute_deepseek_command(cmd: str, result: dict):
         log(f"[DS_EXEC] ❌ {e}")
 
 def _supervisor_auto_loop():
-    """Thread autonomo — chiama DeepSeek ogni 7 secondi e agisce."""
+    """DISABILITATO — sostituito da supervisor_new.py cross-asset."""
+    return  # exit immediato — non chiamare più DeepSeek ogni 7s
     global _last_supervisor_call, _last_supervisor_result
     time.sleep(15)  # attendi boot bot
     log("[DS_AUTO] 🤖 Supervisor autonomo avviato — ogni 7 secondi")
@@ -3431,6 +3447,17 @@ setInterval(updateTimer, 1000);    // countdown ogni 1s
 </html>
 """
 
+
+@app.route('/supervisor/result')
+def supervisor_result():
+    if not _sv_new_ok or not sv_new:
+        return jsonify({"result":{}, "log":[], "next_call_in":300, "assets":[]})
+    return jsonify({
+        "result":       sv_new.get_last_result(),
+        "log":          sv_new.get_log(),
+        "next_call_in": sv_new.get_next_call_in(),
+        "assets":       list(sv_new.get_asset_snapshots().keys()),
+    })
 
 @app.route('/supervisor')
 def supervisor_page():
