@@ -43,7 +43,12 @@ NARRATIVES_DB  = os.environ.get("NARRATIVES_DB", "/home/app/data/narratives.db")
 
 # --- BINANCE -----------------------------------------------------------------
 SYMBOL         = "XAUUSDT"
-BINANCE_WS_URL = f"wss://stream.binance.com:9443/ws/{SYMBOL.lower()}@aggTrade"
+# GOLD usa Binance Futures WebSocket (XAUUSDT è perpetual futures, non spot)
+_IS_FUTURES = SYMBOL in ("XAUUSDT", "BTCUSDT", "ETHUSDT", "SOLUSDT")
+if SYMBOL in ("XAUUSDT",):
+    BINANCE_WS_URL = f"wss://fstream.binance.com/ws/{SYMBOL.lower()}@aggTrade"
+else:
+    BINANCE_WS_URL = f"wss://stream.binance.com:9443/ws/{SYMBOL.lower()}@aggTrade"
 
 # ===========================================================================
 # LOGGING
@@ -5867,31 +5872,15 @@ class OvertopBassanoV15Production:
 
                 # Metriche predizione vs mercato reale
                 if len(_ph) >= 10 and len(_ch) >= 10:
-                    # Predizione dai delta reali del Veritas — non fattore inventato
-                    # Usa il delta medio misurato per ogni livello di carica
-                    _vt_stats = self.veritas._stats if hasattr(self.veritas, '_stats') else {}
-                    _delta_fuoco  = 0.0
-                    _delta_carica = 0.0
-                    _n_fuoco = 0
-                    for k, s in _vt_stats.items():
-                        if 'FUOCO' in k and s.get('n', 0) >= 5:
-                            deltas = s.get('deltas', [])
-                            if deltas:
-                                _delta_fuoco += sum(deltas) / len(deltas)
-                                _n_fuoco += 1
-                        elif 'CARICA' in k and s.get('n', 0) >= 5:
-                            deltas = s.get('deltas', [])
-                            if deltas:
-                                _delta_carica += sum(deltas) / len(deltas)
-                    if _n_fuoco > 0:
-                        _delta_fuoco /= _n_fuoco
-                    # Fallback se Veritas non ha ancora dati sufficienti
-                    if _delta_fuoco == 0 and _ph:
-                        _vt_closed = self.veritas._closed[-200:] if self.veritas._closed else []
-                        _fuoco_d = [s['delta_60'] for s in _vt_closed if s.get('oi_carica',0)>=0.65 and 'delta_60' in s]
-                        _carica_d = [s['delta_60'] for s in _vt_closed if 0.40<=s.get('oi_carica',0)<0.65 and 'delta_60' in s]
-                        if len(_fuoco_d) >= 3: _delta_fuoco = sum(_fuoco_d) / len(_fuoco_d)
-                        if len(_carica_d) >= 3: _delta_carica = sum(_carica_d) / len(_carica_d)
+                    # Delta calcolato direttamente dai segnali chiusi del Veritas
+                    # Non aspetta trade reali — usa i 500 segnali già raccolti
+                    _vt_closed = self.veritas._closed[-200:] if self.veritas._closed else []
+                    _fuoco_deltas  = [s['delta_60'] for s in _vt_closed
+                                      if s.get('oi_carica', 0) >= 0.65 and 'delta_60' in s]
+                    _carica_deltas = [s['delta_60'] for s in _vt_closed
+                                      if 0.40 <= s.get('oi_carica', 0) < 0.65 and 'delta_60' in s]
+                    _delta_fuoco  = sum(_fuoco_deltas)  / len(_fuoco_deltas)  if len(_fuoco_deltas)  >= 3 else (_ph[0] * 0.003 if _ph else 0.0)
+                    _delta_carica = sum(_carica_deltas) / len(_carica_deltas) if len(_carica_deltas) >= 3 else (_ph[0] * 0.001 if _ph else 0.0)
                     # Predizione: prezzo + delta atteso in base alla carica
                     preds = []
                     for i in range(min(len(_ph), len(_ch))):
