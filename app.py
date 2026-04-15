@@ -132,8 +132,6 @@ from breath_engine import BreathEngine
 breath_engine = BreathEngine()
 
 # Respiro Engine — impulso entry/exit
-from respiro_engine import RespiroEngine
-respiro_engine = RespiroEngine()
 
 # Skills
 skill_health    = SkillHealth()
@@ -152,7 +150,6 @@ kernel.attach_skills(
     capsule_engine    = capsule_engine,
     comparto_engine   = comparto_engine,
     nervosismo_engine = nervosismo_engine,
-    respiro_engine    = respiro_engine,
 )
 
 # Carica memoria V15 — fingerprint, capsule, comparti, signal tracker
@@ -217,7 +214,6 @@ def start_websocket():
                     "nervosismo":     nervosismo_engine.get_stato(),
                     "storia_gomme":   nervosismo_engine.get_storia(10),
                     "breath":         breath_engine.get_stato(),
-                    "respiro":        respiro_engine.get_stato(),
                     "oi_stato":     skill_direction._direction if hasattr(skill_direction,'_direction') else "LONG",
                     "diagnosis": {
                         "blocco":       "OK" if not kernel.heartbeat.get("last_decision",{}).get("azione") == "BLOCCA" else "BLOCCA",
