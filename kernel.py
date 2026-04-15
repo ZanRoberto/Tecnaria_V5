@@ -164,12 +164,6 @@ class Kernel:
                 regime      = r.extra.get("regime", "UNKNOWN")
                 regime_conf = r.valore
             
-            # ── 2a. NERVOSISMO — rilevazione tensione ad ogni tick ─────────
-            if self.nervosismo_engine:
-                skills_map = {"ENTRY": self.skill_entry, "EXIT": self.skill_exit}
-                nerv_stato = self.nervosismo_engine.on_tick(price, regime, direction, skills_map)
-                self.heartbeat["nervosismo"] = nerv_stato
-
             # ── 2b. COMPARTO — switcha assetto completo ──────────────────
             if self.comparto_engine and self.skill_regime:
                 volatilita = regime_result.extra.get("volatilita", "MEDIA") if 'regime_result' in dir() else "MEDIA"
@@ -187,6 +181,12 @@ class Kernel:
                 d = self.skill_direction.evaluate(tick, self)
                 skill_log.append(f"DIR:{d.motivo}")
                 direction = d.extra.get("direction", direction)
+
+            # ── 3b. NERVOSISMO — dopo direction ──────────────────────────
+            if self.nervosismo_engine:
+                skills_map = {"ENTRY": self.skill_entry, "EXIT": self.skill_exit}
+                nerv_stato = self.nervosismo_engine.on_tick(price, regime, direction, skills_map)
+                self.heartbeat["nervosismo"] = nerv_stato
 
             # ── 3b. RESPIRO — fase impulso ───────────────────────────────
             respiro_stato = None
